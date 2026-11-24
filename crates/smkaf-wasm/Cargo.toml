@@ -1,0 +1,16 @@
+[package]
+name = "smkaf-wasm"
+description = "streaMonkey audio filters - raw WebAssembly ABI for AudioWorklets"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lib]
+name = "smkaf"
+crate-type = ["cdylib"]
+
+[dependencies]
+smkaf-core.workspace = true

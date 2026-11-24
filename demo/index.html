@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>smkaf playground</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>smkaf playground</h1>
+      <span class="hint">test bench for @streamonkey/audiofilters — not a product</span>
+    </header>
+
+    <section class="panel" id="transport">
+      <button id="start">Start audio</button>
+      <label>Source
+        <select id="source" disabled>
+          <option value="noise">Pink noise (bursts)</option>
+          <option value="tone">Tone 220 Hz + 5 kHz (bursts)</option>
+          <option value="file">Audio file…</option>
+          <option value="mic">Microphone</option>
+        </select>
+      </label>
+      <input type="file" id="file" accept="audio/*" hidden />
+      <label>Input gain <input type="range" id="input-gain" min="-30" max="20" step="0.5" value="0" /> <output id="input-gain-value">0 dB</output></label>
+      <label>Volume <input type="range" id="volume" min="-40" max="0" step="0.5" value="-6" /> <output id="volume-value">-6 dB</output></label>
+      <label class="toggle"><input type="checkbox" id="bypass-all" disabled /> Bypass chain (A/B)</label>
+      <div class="meters" title="output peak L / R">
+        <div class="meter"><div id="meter-l"></div></div>
+        <div class="meter"><div id="meter-r"></div></div>
+        <output id="peak-value">-inf</output>
+      </div>
+    </section>
+
+    <section class="panel" id="add-filter">
+      <label>Add filter <select id="filter-kind"></select></label>
+      <button id="add" disabled>Add</button>
+      <button id="preset" disabled>Load radio chain</button>
+      <button id="clear" disabled>Clear</button>
+    </section>
+
+    <main id="chain"></main>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

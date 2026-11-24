@@ -1,0 +1,27 @@
+[package]
+name = "gst-plugin-smkaf"
+description = "streaMonkey audio filters for GStreamer"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lib]
+name = "gstsmkaf"
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
+
+[dependencies]
+smkaf-core.workspace = true
+gst = { package = "gstreamer", version = "0.25" }
+gst-base = { package = "gstreamer-base", version = "0.25" }
+gst-audio = { package = "gstreamer-audio", version = "0.25" }
+byte-slice-cast = "1"
+
+[dev-dependencies]
+gst-check = { package = "gstreamer-check", version = "0.25" }
+
+[build-dependencies]
+gst-plugin-version-helper = "0.8"

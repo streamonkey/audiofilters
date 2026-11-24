@@ -1,0 +1,52 @@
+# On a version tag (vX.Y.Z, created after running scripts/set-version.sh):
+# publish @streamonkey/audiofilters to npmjs.com and create a GitHub release
+# with the Arch package attached.
+name: Release
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: scripts/check-version.sh "$GITHUB_REF_NAME"
+
+  npm:
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - run: nix develop --command make test
+      - run: |
+          echo '//registry.npmjs.org/:_authToken=${NPM_TOKEN}' > npm/.npmrc
+          nix develop --command sh -c 'cd npm && npm publish'
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  arch:
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: make arch-docker
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arch-package
+          path: packaging/arch/*.pkg.tar.zst
+
+  release:
+    needs: [npm, arch]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          name: arch-package
+      - run: gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --generate-notes *.pkg.tar.zst
+        env:
+          GH_TOKEN: ${{ github.token }}

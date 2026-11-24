@@ -1,0 +1,12 @@
+[package]
+name = "smkaf-tools"
+description = "Build and test helpers: metadata export and native parity fixtures"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+smkaf-core.workspace = true

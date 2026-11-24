@@ -1,0 +1,37 @@
+{
+  "name": "@streamonkey/audiofilters",
+  "version": "0.1.0",
+  "description": "streaMonkey audio filters (compressor, limiter, gate, EQ, de-esser, leveler, stereo tool) as WebAudio AudioWorklet nodes backed by WebAssembly",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/streamonkey/audiofilters.git",
+    "directory": "npm"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./worklet.js": "./dist/worklet.js",
+    "./smkaf.wasm": "./dist/smkaf.wasm",
+    "./filters.json": "./dist/filters.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "prepack": "node scripts/build.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0"
+  }
+}

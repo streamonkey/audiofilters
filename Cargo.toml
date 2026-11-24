@@ -1,0 +1,32 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/smkaf-core",
+    "crates/gst-plugin-smkaf",
+    "crates/smkaf-wasm",
+    "crates/smkaf-tools",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["streaMonkey GmbH"]
+license = "MIT"
+repository = "https://github.com/streamonkey/audiofilters"
+publish = false
+
+[workspace.dependencies]
+smkaf-core = { path = "crates/smkaf-core" }
+
+# Size-optimised build for the WebAssembly module. Rust never applies
+# value-changing float optimisations, so this does not affect parity with
+# the native build.
+[profile.wasm]
+inherits = "release"
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+# Keep the target_features section: wasm-opt reads it to know which wasm
+# features (bulk memory, ...) the module uses. The npm build strips it.
+strip = "debuginfo"

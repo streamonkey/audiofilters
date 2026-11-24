@@ -1,0 +1,10 @@
+/target
+node_modules/
+/npm/dist/
+/npm/src/generated.ts
+/demo/dist/
+/packaging/arch/*.tar.gz
+/packaging/arch/src/
+/packaging/arch/pkg/
+/packaging/arch/*.pkg.tar.*
+.direnv/

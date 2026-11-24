@@ -1,0 +1,43 @@
+# Maintainer: streaMonkey GmbH
+#
+# Build: `make arch-src` in the repository root creates the source tarball
+# next to this file, then run `makepkg` here (or `make arch-docker`).
+
+pkgname=gst-plugin-smkaf
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='streaMonkey audio filters for GStreamer (compressor, limiter, gate, EQ, de-esser, leveler, stereo tool)'
+arch=('x86_64' 'aarch64')
+url='https://github.com/streamonkey/audiofilters'
+license=('MIT')
+depends=('gstreamer' 'gst-plugins-base-libs' 'glib2' 'glibc' 'gcc-libs')
+makedepends=('cargo')
+options=('!lto')
+source=("smkaf-$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+prepare() {
+  cd "smkaf-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  cd "smkaf-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  cargo build --frozen --release -p gst-plugin-smkaf
+}
+
+check() {
+  cd "smkaf-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  cargo test --frozen --release -p smkaf-core -p gst-plugin-smkaf
+}
+
+package() {
+  cd "smkaf-$pkgver"
+  install -Dm755 target/release/libgstsmkaf.so "$pkgdir/usr/lib/gstreamer-1.0/libgstsmkaf.so"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
