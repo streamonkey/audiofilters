@@ -128,6 +128,7 @@ impl Filter for DeEsser {
                 if !self.frequency.is_settled() {
                     self.coefs = highpass(self.fs, self.frequency.next());
                 }
+                self.states.iter_mut().for_each(State::flush);
             }
             self.countdown -= 1;
 

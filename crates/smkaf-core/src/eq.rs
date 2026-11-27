@@ -102,6 +102,8 @@ pub struct Equalizer {
     params: [Smoother; OUTPUT],
     output: Smoother,
     coefs: [Coefs; SECTIONS],
+    /// Sections that are not the identity, i.e. need processing.
+    active: [bool; SECTIONS],
     states: Vec<[State; SECTIONS]>,
     countdown: u32,
     dirty: bool,
@@ -116,6 +118,7 @@ impl Equalizer {
             params: [Smoother::new(0.0, control_rate); OUTPUT],
             output: Smoother::new(1.0, fs),
             coefs: [Coefs::IDENTITY; SECTIONS],
+            active: [false; SECTIONS],
             states: vec![[State::default(); SECTIONS]; channels],
             countdown: 0,
             dirty: true,
@@ -132,7 +135,8 @@ impl Equalizer {
         self.coefs = section_coefs(self.fs, |i| values[i]);
         // Bypassed sections keep no state, so re-enabling them starts clean.
         for (k, c) in self.coefs.iter().enumerate() {
-            if *c == Coefs::IDENTITY {
+            self.active[k] = *c != Coefs::IDENTITY;
+            if !self.active[k] {
                 for st in &mut self.states {
                     st[k] = State::default();
                 }
@@ -164,14 +168,17 @@ impl Filter for Equalizer {
                 if self.dirty {
                     self.update_coefs();
                 }
+                for st in self.states.iter_mut().flatten() {
+                    st.flush();
+                }
             }
             self.countdown -= 1;
 
             let gain = self.output.next();
             for (s, state) in frame.iter_mut().zip(self.states.iter_mut()) {
                 let mut x = *s as f64;
-                for (c, st) in self.coefs.iter().zip(state.iter_mut()) {
-                    if *c != Coefs::IDENTITY {
+                for ((c, st), &on) in self.coefs.iter().zip(state.iter_mut()).zip(&self.active) {
+                    if on {
                         x = st.tick(c, x);
                     }
                 }

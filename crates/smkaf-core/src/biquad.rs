@@ -153,12 +153,22 @@ pub struct State {
 }
 
 impl State {
+    /// One sample. Call [`State::flush`] regularly, e.g. once per control
+    /// period.
     #[inline]
     pub fn tick(&mut self, c: &Coefs, x: f64) -> f64 {
         let y = c.b0 * x + self.z1;
-        self.z1 = flush(c.b1 * x - c.a1 * y + self.z2);
-        self.z2 = flush(c.b2 * x - c.a2 * y);
+        self.z1 = c.b1 * x - c.a1 * y + self.z2;
+        self.z2 = c.b2 * x - c.a2 * y;
         y
+    }
+
+    /// Zero state that is about to become denormal, or is NaN/Inf. Once per
+    /// control period is enough: decaying `f64` state needs far longer than
+    /// that to get from the flush level down to the denormal range.
+    pub fn flush(&mut self) {
+        self.z1 = flush(self.z1);
+        self.z2 = flush(self.z2);
     }
 }
 

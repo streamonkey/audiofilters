@@ -102,6 +102,8 @@ pub struct GraphicEq {
     gains: [Smoother; BANDS],
     output: Smoother,
     coefs: [Coefs; BANDS],
+    /// Bands with a non-zero gain, i.e. that need processing.
+    on: [bool; BANDS],
     states: Vec<[State; BANDS]>,
     countdown: u32,
     dirty: bool,
@@ -122,6 +124,7 @@ impl GraphicEq {
             gains: [Smoother::new(0.0, control_rate); BANDS],
             output: Smoother::new(1.0, fs),
             coefs: [Coefs::IDENTITY; BANDS],
+            on: [false; BANDS],
             states: vec![[State::default(); BANDS]; channels],
             countdown: 0,
             dirty: true,
@@ -186,6 +189,7 @@ impl GraphicEq {
             let g = self.gains[k].next();
             settled &= self.gains[k].is_settled();
             self.coefs[k] = self.band(k, g);
+            self.on[k] = g != 0.0;
             if g == 0.0 {
                 // Bypassed bands keep no state, so re-enabling them starts clean.
                 for st in &mut self.states {
@@ -250,14 +254,17 @@ impl Filter for GraphicEq {
                 if self.dirty {
                     self.update_coefs();
                 }
+                for st in self.states.iter_mut().flatten() {
+                    st.flush();
+                }
             }
             self.countdown -= 1;
 
             let gain = self.output.next();
             for (s, state) in frame.iter_mut().zip(self.states.iter_mut()) {
                 let mut x = *s as f64;
-                for (c, st) in self.coefs[..self.active].iter().zip(state.iter_mut()) {
-                    if *c != Coefs::IDENTITY {
+                for ((c, st), &on) in self.coefs[..self.active].iter().zip(state.iter_mut()).zip(&self.on) {
+                    if on {
                         x = st.tick(c, x);
                     }
                 }
