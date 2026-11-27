@@ -11,7 +11,7 @@ use core::f64::consts::FRAC_1_SQRT_2;
 
 use crate::biquad::{Coefs, Shape, State};
 use crate::compressor::gain_computer;
-use crate::util::{ballistics, db_to_lin, lin_to_db, time_coef, Smoother, CONTROL_FRAMES};
+use crate::util::{ballistics, db_to_lin, lin_to_db, time_coef, DbToLin, Smoother, CONTROL_FRAMES};
 use crate::{Filter, FilterDesc, GraphKind, ParamInfo};
 
 const FREQUENCY: usize = 0;
@@ -52,6 +52,9 @@ pub struct DeEsser {
     fs: f64,
     channels: usize,
     threshold: f64,
+    /// `threshold` as amplitude: below it there is no reduction, so most
+    /// frames need no `log10`.
+    threshold_lin: f64,
     ratio: f64,
     max_reduction: f64,
     attack: f64,
@@ -65,6 +68,7 @@ pub struct DeEsser {
     states: Vec<State>,
     highs: Vec<f64>,
     gain: f64,
+    gain_lin: DbToLin,
     meter: f64,
 }
 
@@ -74,6 +78,7 @@ impl DeEsser {
             fs,
             channels,
             threshold: 0.0,
+            threshold_lin: 1.0,
             ratio: 1.0,
             max_reduction: 0.0,
             attack: time_coef(ATTACK_MS, fs),
@@ -86,6 +91,7 @@ impl DeEsser {
             states: vec![State::default(); channels],
             highs: vec![0.0; channels],
             gain: 0.0,
+            gain_lin: DbToLin::new(),
             meter: 0.0,
         }
     }
@@ -101,7 +107,10 @@ impl Filter for DeEsser {
         let v = info.sanitize(value) as f64;
         match index {
             FREQUENCY => self.frequency.set(v),
-            THRESHOLD => self.threshold = v,
+            THRESHOLD => {
+                self.threshold = v;
+                self.threshold_lin = db_to_lin(v);
+            }
             RATIO => self.ratio = v,
             MAX_REDUCTION => self.max_reduction = v,
             RELEASE => self.release = time_coef(v, self.fs),
@@ -131,12 +140,12 @@ impl Filter for DeEsser {
                     peak = a;
                 }
             }
-            let target = self.reduction(lin_to_db(peak));
+            let target = if peak <= self.threshold_lin { 0.0 } else { self.reduction(lin_to_db(peak)) };
             self.gain = ballistics(self.gain, target, self.attack, self.release);
             if self.gain < meter {
                 meter = self.gain;
             }
-            let g = db_to_lin(self.gain);
+            let g = self.gain_lin.get(self.gain);
 
             for (s, &hi) in frame.iter_mut().zip(self.highs.iter()) {
                 let x = *s as f64;

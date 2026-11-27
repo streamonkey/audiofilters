@@ -9,6 +9,30 @@ pub fn db_to_lin(db: f64) -> f64 {
     libm::exp(db * (core::f64::consts::LN_10 / 20.0))
 }
 
+/// [`db_to_lin`] that skips the `exp` while the input stays the same, which
+/// is the common steady state of gain envelopes (gate open or closed,
+/// compressor idle, leveler frozen). Bit-identical to calling `db_to_lin`.
+#[derive(Debug, Clone, Copy)]
+pub struct DbToLin {
+    db: f64,
+    lin: f64,
+}
+
+impl DbToLin {
+    pub const fn new() -> Self {
+        Self { db: 0.0, lin: 1.0 }
+    }
+
+    #[inline]
+    pub fn get(&mut self, db: f64) -> f64 {
+        if db != self.db {
+            self.db = db;
+            self.lin = db_to_lin(db);
+        }
+        self.lin
+    }
+}
+
 /// Amplitude to dBFS.
 #[inline]
 pub fn lin_to_db(x: f64) -> f64 {

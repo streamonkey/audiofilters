@@ -5,7 +5,7 @@ use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
 
-use crate::util::{ballistics, db_to_lin, flush, lin_to_db, mean_square, peak, pow_to_db, time_coef, Smoother};
+use crate::util::{ballistics, db_to_lin, flush, lin_to_db, mean_square, peak, pow_to_db, time_coef, DbToLin, Smoother};
 use crate::{Filter, FilterDesc, GraphKind, ParamInfo};
 
 const THRESHOLD: usize = 0;
@@ -73,6 +73,8 @@ pub struct Compressor {
     gain: Vec<f64>,
     /// Per detector: mean square for the RMS detector.
     power: Vec<f64>,
+    /// Per detector: linear version of gain plus makeup.
+    gain_lin: Vec<DbToLin>,
     meter: f64,
 }
 
@@ -93,20 +95,20 @@ impl Compressor {
             link: true,
             gain: vec![0.0; channels],
             power: vec![0.0; channels],
+            gain_lin: vec![DbToLin::new(); channels],
             meter: 0.0,
         }
     }
 
-    /// Update detector `d` with input `x` and return its smoothed gain
-    /// change in dB.
+    /// Update detector `d` with input `x` (the amplitude for the peak
+    /// detector, the power for RMS) and return its smoothed gain change in dB.
     #[inline]
     fn gain_db(&mut self, d: usize, x: f64, threshold: f64, ratio: f64, knee: f64) -> f64 {
         let level = if self.rms {
-            let sq = x * x;
-            self.power[d] = flush(sq + (self.power[d] - sq) * self.rms_coef);
+            self.power[d] = flush(x + (self.power[d] - x) * self.rms_coef);
             pow_to_db(self.power[d])
         } else {
-            lin_to_db(libm::fabs(x))
+            lin_to_db(x)
         };
         let target = gain_computer(level, threshold, ratio, knee) - level;
         self.gain[d] = ballistics(self.gain[d], target, self.attack, self.release);
@@ -154,28 +156,24 @@ impl Filter for Compressor {
             let makeup = self.makeup.next();
             let mix = self.mix.next();
 
-            let wet = |g: f64| (1.0 - mix) + db_to_lin(g + makeup) * mix;
 
             if self.link {
                 // The loudest channel (peak) or the mean power (RMS) drives one
                 // shared gain.
-                let x = if self.rms {
-                    libm::sqrt(mean_square(frame))
-                } else {
-                    peak(frame)
-                };
+                let x = if self.rms { mean_square(frame) } else { peak(frame) };
                 let g = self.gain_db(0, x, t, r, k);
                 meter = meter.min(g);
-                let gain = wet(g);
+                let gain = (1.0 - mix) + self.gain_lin[0].get(g + makeup) * mix;
                 for s in frame.iter_mut() {
                     *s = (*s as f64 * gain) as f32;
                 }
             } else {
                 for (c, s) in frame.iter_mut().enumerate() {
                     let x = *s as f64;
-                    let g = self.gain_db(c, x, t, r, k);
+                    let g = self.gain_db(c, if self.rms { x * x } else { libm::fabs(x) }, t, r, k);
                     meter = meter.min(g);
-                    *s = (x * wet(g)) as f32;
+                    let gain = (1.0 - mix) + self.gain_lin[c].get(g + makeup) * mix;
+                    *s = (x * gain) as f32;
                 }
             }
         }

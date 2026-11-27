@@ -8,7 +8,7 @@
 
 use alloc::boxed::Box;
 
-use crate::util::{db_to_lin, flush, mean_square, pow_to_db, time_coef};
+use crate::util::{flush, mean_square, pow_to_db, time_coef, DbToLin};
 use crate::{Filter, FilterDesc, GraphKind, ParamInfo};
 
 const TARGET: usize = 0;
@@ -51,6 +51,7 @@ pub struct Leveler {
     window: f64,
     power: f64,
     gain: f64,
+    gain_lin: DbToLin,
 }
 
 impl Leveler {
@@ -67,6 +68,7 @@ impl Leveler {
             window: 0.0,
             power: 0.0,
             gain: 0.0,
+            gain_lin: DbToLin::new(),
         }
     }
 
@@ -102,7 +104,7 @@ impl Filter for Leveler {
                 let c = if wanted > self.gain { self.raise } else { self.lower };
                 self.gain = flush(wanted + (self.gain - wanted) * c);
             }
-            let g = db_to_lin(self.gain);
+            let g = self.gain_lin.get(self.gain);
             for s in frame.iter_mut() {
                 *s = (*s as f64 * g) as f32;
             }
@@ -129,6 +131,7 @@ impl Filter for Leveler {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::util::db_to_lin;
 
     #[test]
     fn converges_to_target_and_freezes() {

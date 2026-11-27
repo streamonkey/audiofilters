@@ -4,7 +4,7 @@
 
 use alloc::boxed::Box;
 
-use crate::util::{ballistics, db_to_lin, flush, lin_to_db, peak, time_coef};
+use crate::util::{ballistics, db_to_lin, flush, peak, time_coef, DbToLin};
 use crate::{Filter, FilterDesc, GraphKind, ParamInfo};
 
 const THRESHOLD: usize = 0;
@@ -39,6 +39,10 @@ const ENVELOPE_MS: f64 = 10.0;
 pub struct Gate {
     fs: f64,
     channels: usize,
+    /// Threshold and threshold minus hysteresis, linear, compared with the
+    /// envelope directly so it needs no `log10` per frame.
+    open_level: f64,
+    close_level: f64,
     threshold: f64,
     hysteresis: f64,
     range: f64,
@@ -50,6 +54,7 @@ pub struct Gate {
     open: bool,
     hold: u32,
     gain: f64,
+    gain_lin: DbToLin,
 }
 
 impl Gate {
@@ -57,6 +62,8 @@ impl Gate {
         Self {
             fs,
             channels,
+            open_level: 1.0,
+            close_level: 1.0,
             threshold: 0.0,
             hysteresis: 0.0,
             range: 0.0,
@@ -68,6 +75,7 @@ impl Gate {
             open: false,
             hold: 0,
             gain: 0.0,
+            gain_lin: DbToLin::new(),
         }
     }
 }
@@ -85,20 +93,21 @@ impl Filter for Gate {
             RELEASE => self.release = time_coef(v, self.fs),
             _ => {}
         }
+        self.open_level = db_to_lin(self.threshold);
+        self.close_level = db_to_lin(self.threshold - self.hysteresis);
     }
 
     fn process(&mut self, buf: &mut [f32]) {
         for frame in buf.chunks_exact_mut(self.channels) {
             let peak = peak(frame);
             self.env = if peak > self.env { peak } else { flush(self.env * self.env_coef) };
-            let level = lin_to_db(self.env);
 
             if !self.open {
-                if level > self.threshold {
+                if self.env > self.open_level {
                     self.open = true;
                     self.hold = self.hold_frames;
                 }
-            } else if level >= self.threshold - self.hysteresis {
+            } else if self.env >= self.close_level {
                 self.hold = self.hold_frames;
             } else if self.hold > 0 {
                 self.hold -= 1;
@@ -109,7 +118,7 @@ impl Filter for Gate {
             let target = if self.open { 0.0 } else { self.range };
             // A falling gain means the gate is closing, so that is the release.
             self.gain = ballistics(self.gain, target, self.release, self.attack);
-            let g = db_to_lin(self.gain);
+            let g = self.gain_lin.get(self.gain);
             for s in frame.iter_mut() {
                 *s = (*s as f64 * g) as f32;
             }
