@@ -27,12 +27,12 @@ flake.nix                    dev shell (Rust + wasm32, GStreamer, Node, binaryen
 crates/smkaf-core/           #![no_std] DSP, one module per filter + parameter metadata
 crates/gst-plugin-smkaf/     GStreamer plugin (libgstsmkaf.so), elements generated from the metadata
 crates/smkaf-wasm/           raw extern "C" wasm ABI (no wasm-bindgen, no imports)
-crates/smkaf-tools/          metadata export (for npm) + native parity fixtures
+crates/smkaf-tools/          metadata export (for npm), native parity fixtures, native benchmark
 npm/                         @streamonkey/audiofilters: TS API, worklet, build script
 demo/                        Vite playground for trying the filters in the browser (testing only)
 packaging/arch/              PKGBUILD, source tarball script, container build
 packaging/nix/               Nix package (flake output and overlay)
-tests/                       native-vs-wasm parity test, worklet glue test
+tests/                       native-vs-wasm parity test, worklet glue test, wasm benchmark
 ```
 
 ## Development
@@ -43,6 +43,7 @@ make test            # Rust unit + GStreamer harness tests, wasm parity, worklet
 make gst             # target/release/libgstsmkaf.so
 make npm             # npm/dist
 make demo            # playground at http://localhost:5173
+make bench           # per-filter ns/frame, native and wasm (bench-native: native only)
 ```
 
 Inside a git repository, Nix only sees files that are tracked or staged.

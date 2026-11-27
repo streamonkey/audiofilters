@@ -1,7 +1,7 @@
 # Run inside `nix develop`.
 FIXTURES := target/parity-fixtures
 
-.PHONY: all gst npm test test-rust test-js demo arch-src arch-docker clean
+.PHONY: all gst npm test test-rust test-js bench bench-native demo arch-src arch-docker clean
 
 all: gst npm
 
@@ -23,6 +23,14 @@ test-js: npm
 	cargo run --locked -q --release -p smkaf-tools -- fixtures $(FIXTURES)
 	node tests/parity/parity.mjs $(FIXTURES) npm/dist/smkaf.wasm
 	node tests/worklet/worklet.test.mjs npm/dist
+
+## per-filter timings, native and wasm (same signal and parameter events)
+bench: bench-native npm
+	cargo run --locked -q --release -p smkaf-tools -- fixtures $(FIXTURES)
+	node tests/bench/bench.mjs $(FIXTURES) npm/dist/smkaf.wasm
+
+bench-native:
+	cargo run --locked -q --release -p smkaf-tools -- bench
 
 ## browser playground on http://localhost:5173
 demo: npm
