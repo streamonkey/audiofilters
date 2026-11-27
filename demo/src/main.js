@@ -22,13 +22,24 @@ for (const f of FILTERS) {
 
 // ---------------------------------------------------------------- audio graph
 
+// The context is created right away so the chain can be built before any
+// audio plays. Browsers keep it suspended until a user gesture; Start
+// resumes it and starts the source.
+const ready = init();
+let started = false;
+
 $('start').onclick = async () => {
-  if (ctx) {
-    if (ctx.state === 'running') await ctx.suspend();
-    else await ctx.resume();
-    $('start').textContent = ctx.state === 'running' ? 'Pause' : 'Resume';
-    return;
-  }
+  await ready;
+  if (!started) {
+    started = true;
+    await ctx.resume();
+    await setSource($('source').value);
+  } else if (ctx.state === 'running') await ctx.suspend();
+  else await ctx.resume();
+  $('start').textContent = ctx.state === 'running' ? 'Pause' : 'Resume';
+};
+
+async function init() {
   ctx = new AudioContext({ latencyHint: 'interactive' });
   filters = await AudioFilters.load(ctx);
 
@@ -48,11 +59,9 @@ $('start').onclick = async () => {
   });
 
   for (const id of ['source', 'add', 'preset', 'clear', 'bypass-all']) $(id).disabled = false;
-  $('start').textContent = 'Pause';
-  await setSource($('source').value);
   loadPreset();
   requestAnimationFrame(drawOutputMeter);
-};
+}
 
 function rewire() {
   inputGain.disconnect();
@@ -162,7 +171,7 @@ async function setSource(kind) {
 
 $('source').onchange = (e) => {
   if (e.target.value === 'file') fileBuffer = null;
-  setSource(e.target.value);
+  if (started) setSource(e.target.value);
 };
 
 $('file').onchange = async (e) => {
