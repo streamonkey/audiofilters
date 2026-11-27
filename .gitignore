@@ -1,4 +1,5 @@
 /target
+/result
 node_modules/
 /npm/dist/
 /npm/src/generated.ts
