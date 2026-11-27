@@ -8,3 +8,18 @@ node_modules/
 /packaging/arch/pkg/
 /packaging/arch/*.pkg.tar.*
 .direnv/
+
+# Placeholders the Claude Code sandbox mounts over these paths
+/.bash_profile
+/.bashrc
+/.gitconfig
+/.idea
+/.mcp.json
+/.profile
+/.ripgreprc
+/.vscode
+/.zprofile
+/.zshrc
+/.claude/agents
+/.claude/commands
+/.claude/.cc-writes/
