@@ -19,7 +19,7 @@ use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
 
-use crate::biquad::{Coefs, Shape, State};
+use crate::biquad::{Coefs, Probe, Shape, State};
 use crate::util::{db_to_lin, lin_to_db, Smoother, CONTROL_FRAMES};
 use crate::{Filter, FilterDesc, GraphKind, ParamInfo};
 
@@ -91,6 +91,9 @@ pub struct GraphicEq {
     channels: usize,
     /// Number of active bands (the lowest ones).
     active: usize,
+    /// `centre(k)` per band, and the same as response probes for the solve.
+    centres: [f64; BANDS],
+    probes: [Probe; BANDS],
     sliders: [f64; BANDS],
     /// Solved filter gains in dB for `sliders`; `None` after a slider
     /// changed. A `Cell` because `graph` (`&self`) may solve first.
@@ -107,10 +110,13 @@ pub struct GraphicEq {
 impl GraphicEq {
     fn new(fs: f64, channels: usize) -> Self {
         let control_rate = fs / CONTROL_FRAMES as f64;
+        let centres: [f64; BANDS] = core::array::from_fn(centre);
         Self {
             fs,
             channels,
-            active: (0..BANDS).take_while(|&k| centre(k) < fs * MAX_BAND_RATIO).count(),
+            active: centres.iter().take_while(|&&f| f < fs * MAX_BAND_RATIO).count(),
+            centres,
+            probes: centres.map(|f| Probe::new(fs, f)),
             sliders: [0.0; BANDS],
             solved: Cell::new(None),
             gains: [Smoother::new(0.0, control_rate); BANDS],
@@ -126,7 +132,7 @@ impl GraphicEq {
         if gain_db == 0.0 {
             Coefs::IDENTITY
         } else {
-            Coefs::new(Shape::Peaking, self.fs, centre(k), Q, gain_db)
+            Coefs::new(Shape::Peaking, self.fs, self.centres[k], Q, gain_db)
         }
     }
 
@@ -147,8 +153,8 @@ impl GraphicEq {
                 // Response per dB of band j, from a non-zero probe gain.
                 let probe = if libm::fabs(x[j]) < 1.0 { 1.0 } else { x[j] };
                 let c = self.band(j, probe);
-                for (k, row) in m[..n].iter_mut().enumerate() {
-                    row[j] = c.response_db(self.fs, centre(k)) / probe;
+                for (row, p) in m[..n].iter_mut().zip(&self.probes) {
+                    row[j] = c.response_db_at(p) / probe;
                 }
             }
             for (k, row) in m[..n].iter_mut().enumerate() {

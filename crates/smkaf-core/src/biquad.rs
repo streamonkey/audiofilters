@@ -3,7 +3,7 @@
 
 use core::f64::consts::PI;
 
-use crate::util::{flush, lin_to_db};
+use crate::util::{db_to_lin, flush, lin_to_db};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Shape {
@@ -34,7 +34,7 @@ impl Coefs {
         let w0 = 2.0 * PI * freq / sample_rate;
         let (sin, cos) = (libm::sin(w0), libm::cos(w0));
         let alpha = sin / (2.0 * q.max(0.01));
-        let a = libm::pow(10.0, gain_db / 40.0);
+        let a = db_to_lin(gain_db / 2.0);
         let sqa2 = 2.0 * libm::sqrt(a) * alpha;
 
         let (b0, b1, b2, a0, a1, a2) = match shape {
@@ -70,14 +70,33 @@ impl Coefs {
 
     /// Magnitude response in dB at `freq`.
     pub fn response_db(&self, sample_rate: f64, freq: f64) -> f64 {
-        let w = 2.0 * PI * freq / sample_rate;
-        let (c1, s1) = (libm::cos(w), libm::sin(w));
-        let (c2, s2) = (libm::cos(2.0 * w), libm::sin(2.0 * w));
-        let nr = self.b0 + self.b1 * c1 + self.b2 * c2;
-        let ni = -(self.b1 * s1 + self.b2 * s2);
-        let dr = 1.0 + self.a1 * c1 + self.a2 * c2;
-        let di = -(self.a1 * s1 + self.a2 * s2);
+        self.response_db_at(&Probe::new(sample_rate, freq))
+    }
+
+    /// Magnitude response in dB at a precomputed frequency.
+    pub fn response_db_at(&self, p: &Probe) -> f64 {
+        let nr = self.b0 + self.b1 * p.c1 + self.b2 * p.c2;
+        let ni = -(self.b1 * p.s1 + self.b2 * p.s2);
+        let dr = 1.0 + self.a1 * p.c1 + self.a2 * p.c2;
+        let di = -(self.a1 * p.s1 + self.a2 * p.s2);
         lin_to_db(libm::sqrt((nr * nr + ni * ni) / (dr * dr + di * di)))
+    }
+}
+
+/// `cos`/`sin` of `w` and `2w` for one frequency, so responses at a fixed
+/// frequency can be evaluated repeatedly without trigonometry.
+#[derive(Debug, Clone, Copy)]
+pub struct Probe {
+    c1: f64,
+    s1: f64,
+    c2: f64,
+    s2: f64,
+}
+
+impl Probe {
+    pub fn new(sample_rate: f64, freq: f64) -> Self {
+        let w = 2.0 * PI * freq / sample_rate;
+        Self { c1: libm::cos(w), s1: libm::sin(w), c2: libm::cos(2.0 * w), s2: libm::sin(2.0 * w) }
     }
 }
 
@@ -94,7 +113,7 @@ fn matched_peaking(w0: f64, q: f64, gain_db: f64) -> Coefs {
         let c = matched_peaking(w0, q, -gain_db);
         return Coefs { b0: 1.0 / c.b0, b1: c.a1 / c.b0, b2: c.a2 / c.b0, a1: c.b1 / c.b0, a2: c.b2 / c.b0 };
     }
-    let g = libm::pow(10.0, gain_db / 20.0);
+    let g = db_to_lin(gain_db);
     let zeta = 1.0 / (2.0 * q * libm::sqrt(g));
     let r = libm::exp(-zeta * w0);
     let a1 = if zeta <= 1.0 {
